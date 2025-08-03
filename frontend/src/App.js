@@ -563,7 +563,7 @@ const Footer = () => {
             <h3 className="text-2xl font-bold mb-4">🚀 Devset</h3>
             <p className="text-gray-300 mb-4">
               Empowering the next generation of tech professionals with comprehensive 
-              career guidance and learning resources.
+              career guidance and learning resources powered by Devset.
             </p>
             <div className="flex space-x-4">
               <span className="text-2xl cursor-pointer hover:text-blue-400">📧</span>
