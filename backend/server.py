@@ -345,7 +345,7 @@ async def get_blog_posts():
             "id": str(uuid.uuid4()),
             "title": "How to Stay Motivated While Learning to Code",
             "excerpt": "Practical tips to maintain motivation during your coding journey",
-            "author": "TechPathfinder Team",
+            "author": "Devset Team",
             "created_at": datetime.utcnow(),
             "tags": ["motivation", "learning", "coding"]
         },
