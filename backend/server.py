@@ -353,7 +353,7 @@ async def get_blog_posts():
             "id": str(uuid.uuid4()),
             "title": "Building Your First Portfolio Project",
             "excerpt": "Step-by-step guide to creating impressive portfolio projects",
-            "author": "TechPathfinder Team",
+            "author": "Devset Team",
             "created_at": datetime.utcnow(),
             "tags": ["portfolio", "projects", "career"]
         },
