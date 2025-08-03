@@ -361,7 +361,7 @@ async def get_blog_posts():
             "id": str(uuid.uuid4()),
             "title": "Networking Tips for CS Students",
             "excerpt": "How to build professional relationships in the tech industry",
-            "author": "TechPathfinder Team",
+            "author": "Devset Team",
             "created_at": datetime.utcnow(),
             "tags": ["networking", "career", "students"]
         }
