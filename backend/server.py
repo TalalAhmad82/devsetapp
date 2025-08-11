@@ -259,7 +259,7 @@ async def health_check():
 # Auth endpoints
 @app.get("/api/auth/login")
 async def initiate_login():
-    preview_url = "https://7991c8f9-7227-4549-bf49-8d97d5ffe24d.preview.emergentagent.com"
+    preview_url = "https://9a02cb3f-b17a-42e2-8ece-2337c532d6e6.preview.emergentagent.com"
     auth_url = f"https://auth.emergentagent.com/?redirect={preview_url}/profile"
     return {"auth_url": auth_url}
 
