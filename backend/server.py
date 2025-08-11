@@ -13,6 +13,8 @@ import uvicorn
 # Environment variables
 MONGO_URL = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 DB_NAME = os.environ.get('DB_NAME', 'techpathfinder_db')
+ADZUNA_APP_ID = os.environ.get('ADZUNA_APP_ID')
+ADZUNA_API_KEY = os.environ.get('ADZUNA_API_KEY')
 
 # MongoDB setup
 client = MongoClient(MONGO_URL)
