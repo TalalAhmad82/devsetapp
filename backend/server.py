@@ -25,6 +25,7 @@ users_collection = db.users
 sessions_collection = db.sessions
 career_paths_collection = db.career_paths
 resources_collection = db.resources
+job_applications_collection = db.job_applications
 
 app = FastAPI(title="TechPathfinder API", description="CS/IT Career Guidance Platform")
 
