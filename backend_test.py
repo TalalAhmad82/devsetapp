@@ -278,6 +278,200 @@ class BackendTester:
         except Exception as e:
             self.log_test("Blog Posts", False, f"Connection error: {str(e)}")
             return False
+
+    def test_job_search(self):
+        """Test POST /api/jobs/search endpoint"""
+        try:
+            # Test basic job search
+            search_data = {
+                "query": "software engineer",
+                "location": "San Francisco",
+                "job_type": "full_time"
+            }
+            
+            response = self.session.post(f"{API_BASE}/jobs/search", 
+                                       json=search_data, timeout=15)
+            
+            if response.status_code == 200:
+                data = response.json()
+                results = data.get("results", [])
+                count = data.get("count", 0)
+                
+                if results and count > 0:
+                    # Verify job structure
+                    first_job = results[0]
+                    required_fields = ["id", "title", "company", "location", "description", "salary", "job_type"]
+                    missing_fields = [field for field in required_fields if field not in first_job]
+                    
+                    if not missing_fields:
+                        self.log_test("Job Search API", True, f"Found {count} jobs with complete structure")
+                        
+                        # Test different search parameters
+                        search_data2 = {"query": "data scientist"}
+                        response2 = self.session.post(f"{API_BASE}/jobs/search", 
+                                                    json=search_data2, timeout=15)
+                        
+                        if response2.status_code == 200:
+                            self.log_test("Job Search (Different Query)", True, "Successfully handled different search parameters")
+                            return True
+                        else:
+                            self.log_test("Job Search (Different Query)", False, f"HTTP {response2.status_code}")
+                            return False
+                    else:
+                        self.log_test("Job Search API", False, f"Missing fields in job results: {missing_fields}")
+                        return False
+                else:
+                    self.log_test("Job Search API", False, "No job results returned")
+                    return False
+            else:
+                self.log_test("Job Search API", False, f"HTTP {response.status_code}", response.text)
+                return False
+                
+        except Exception as e:
+            self.log_test("Job Search API", False, f"Connection error: {str(e)}")
+            return False
+
+    def test_resume_templates(self):
+        """Test GET /api/resume-templates endpoint"""
+        try:
+            response = self.session.get(f"{API_BASE}/resume-templates", timeout=10)
+            
+            if response.status_code == 200:
+                templates = response.json()
+                
+                if isinstance(templates, list) and len(templates) >= 3:
+                    # Verify template structure
+                    first_template = templates[0]
+                    required_fields = ["id", "name", "description", "download_url", "category"]
+                    missing_fields = [field for field in required_fields if field not in first_template]
+                    
+                    if not missing_fields:
+                        # Check for expected template IDs
+                        template_ids = [t.get("id") for t in templates]
+                        expected_ids = ["software_engineer", "data_scientist", "web_developer", "cybersecurity"]
+                        found_expected = [tid for tid in expected_ids if tid in template_ids]
+                        
+                        if len(found_expected) >= 2:
+                            self.log_test("Resume Templates API", True, f"Found {len(templates)} templates with proper structure")
+                            return True, templates
+                        else:
+                            self.log_test("Resume Templates API", False, f"Missing expected template IDs: {expected_ids}")
+                            return False, None
+                    else:
+                        self.log_test("Resume Templates API", False, f"Missing fields: {missing_fields}")
+                        return False, None
+                else:
+                    self.log_test("Resume Templates API", False, f"Expected at least 3 templates, got {len(templates) if isinstance(templates, list) else 'invalid format'}")
+                    return False, None
+            else:
+                self.log_test("Resume Templates API", False, f"HTTP {response.status_code}", response.text)
+                return False, None
+                
+        except Exception as e:
+            self.log_test("Resume Templates API", False, f"Connection error: {str(e)}")
+            return False, None
+
+    def test_resume_template_download(self, templates):
+        """Test GET /api/resume-templates/{template_id}/download endpoint"""
+        if not templates:
+            self.log_test("Resume Template Download", False, "No templates available for testing")
+            return False
+            
+        try:
+            # Test with valid template IDs
+            test_templates = ["software_engineer", "data_scientist"]
+            success_count = 0
+            
+            for template_id in test_templates:
+                response = self.session.get(f"{API_BASE}/resume-templates/{template_id}/download", timeout=10)
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    
+                    # Verify template content structure
+                    if "template_name" in data and "sections" in data:
+                        sections = data.get("sections", [])
+                        if sections and isinstance(sections, list):
+                            # Check section structure
+                            first_section = sections[0]
+                            if "name" in first_section and "content" in first_section:
+                                self.log_test(f"Resume Template Download ({template_id})", True, 
+                                            f"Downloaded template with {len(sections)} sections")
+                                success_count += 1
+                            else:
+                                self.log_test(f"Resume Template Download ({template_id})", False, 
+                                            "Invalid section structure")
+                        else:
+                            self.log_test(f"Resume Template Download ({template_id})", False, 
+                                        "Missing or invalid sections")
+                    else:
+                        self.log_test(f"Resume Template Download ({template_id})", False, 
+                                    "Missing template_name or sections")
+                else:
+                    self.log_test(f"Resume Template Download ({template_id})", False, 
+                                f"HTTP {response.status_code}")
+            
+            # Test with invalid template ID
+            response = self.session.get(f"{API_BASE}/resume-templates/invalid_template/download", timeout=10)
+            if response.status_code == 404:
+                self.log_test("Resume Template Download (Invalid ID)", True, "Correctly returned 404 for invalid template")
+                success_count += 1
+            else:
+                self.log_test("Resume Template Download (Invalid ID)", False, f"Expected 404, got {response.status_code}")
+            
+            return success_count >= 2
+                
+        except Exception as e:
+            self.log_test("Resume Template Download", False, f"Connection error: {str(e)}")
+            return False
+
+    def test_job_application_auth_required(self):
+        """Test POST /api/jobs/apply endpoint (authentication required)"""
+        try:
+            # Test without authentication (should fail)
+            application_data = {
+                "job_id": "test_job_123",
+                "applicant_name": "John Smith",
+                "email": "john.smith@email.com",
+                "phone": "555-0123",
+                "cover_letter": "I am interested in this position..."
+            }
+            
+            response = self.session.post(f"{API_BASE}/jobs/apply", json=application_data, timeout=10)
+            
+            if response.status_code == 403:
+                self.log_test("Job Application (No Auth)", True, "Correctly requires authentication")
+                return True
+            elif response.status_code == 401:
+                self.log_test("Job Application (No Auth)", True, "Correctly requires authentication (401)")
+                return True
+            else:
+                self.log_test("Job Application (No Auth)", False, f"Expected 401/403, got {response.status_code}")
+                return False
+                
+        except Exception as e:
+            self.log_test("Job Application (No Auth)", False, f"Connection error: {str(e)}")
+            return False
+
+    def test_my_applications_auth_required(self):
+        """Test GET /api/jobs/my-applications endpoint (authentication required)"""
+        try:
+            # Test without authentication (should fail)
+            response = self.session.get(f"{API_BASE}/jobs/my-applications", timeout=10)
+            
+            if response.status_code == 403:
+                self.log_test("My Applications (No Auth)", True, "Correctly requires authentication")
+                return True
+            elif response.status_code == 401:
+                self.log_test("My Applications (No Auth)", True, "Correctly requires authentication (401)")
+                return True
+            else:
+                self.log_test("My Applications (No Auth)", False, f"Expected 401/403, got {response.status_code}")
+                return False
+                
+        except Exception as e:
+            self.log_test("My Applications (No Auth)", False, f"Connection error: {str(e)}")
+            return False
     
     def run_all_tests(self):
         """Run all backend tests"""
