@@ -437,5 +437,249 @@ async def get_job_guidance():
     }
     return guidance
 
+# Job search endpoint using Adzuna API
+@app.post("/api/jobs/search")
+async def search_jobs(search_query: JobSearchQuery):
+    if not ADZUNA_APP_ID or not ADZUNA_API_KEY:
+        # Return mock data if API keys are not configured
+        mock_jobs = [
+            {
+                "id": "mock_job_1",
+                "title": "Junior Software Developer",
+                "company": "Tech StartUp Inc.",
+                "location": "Remote / San Francisco",
+                "description": "Join our team as a junior developer working on cutting-edge web applications.",
+                "salary": "$60,000 - $80,000",
+                "job_type": "full_time",
+                "experience_level": "entry",
+                "posted_date": "2025-01-10",
+                "apply_url": "#"
+            },
+            {
+                "id": "mock_job_2", 
+                "title": "Data Science Intern",
+                "company": "Analytics Corp",
+                "location": "New York, NY",
+                "description": "Summer internship opportunity in data science and machine learning.",
+                "salary": "$20/hour",
+                "job_type": "internship",
+                "experience_level": "entry",
+                "posted_date": "2025-01-09",
+                "apply_url": "#"
+            },
+            {
+                "id": "mock_job_3",
+                "title": "Frontend Developer",
+                "company": "Digital Solutions",
+                "location": "Austin, TX",
+                "description": "Build beautiful user interfaces with React and modern CSS frameworks.",
+                "salary": "$70,000 - $90,000",
+                "job_type": "full_time",
+                "experience_level": "mid",
+                "posted_date": "2025-01-08",
+                "apply_url": "#"
+            }
+        ]
+        return {"results": mock_jobs, "count": len(mock_jobs)}
+    
+    try:
+        # Adzuna API integration
+        base_url = "https://api.adzuna.com/v1/api/jobs/us/search/1"
+        params = {
+            "app_id": ADZUNA_APP_ID,
+            "app_key": ADZUNA_API_KEY,
+            "what": search_query.query,
+            "results_per_page": 20
+        }
+        
+        if search_query.location:
+            params["where"] = search_query.location
+            
+        response = requests.get(base_url, params=params)
+        response.raise_for_status()
+        
+        data = response.json()
+        jobs = []
+        
+        for job in data.get("results", []):
+            jobs.append({
+                "id": job.get("id", ""),
+                "title": job.get("title", ""),
+                "company": job.get("company", {}).get("display_name", ""),
+                "location": job.get("location", {}).get("display_name", ""),
+                "description": job.get("description", "")[:300] + "..." if len(job.get("description", "")) > 300 else job.get("description", ""),
+                "salary": f"${job.get('salary_min', 'N/A')} - ${job.get('salary_max', 'N/A')}" if job.get('salary_min') else "Salary not specified",
+                "job_type": "full_time",  # Adzuna doesn't always provide this
+                "experience_level": "entry",  # Default for student-focused platform
+                "posted_date": job.get("created", ""),
+                "apply_url": job.get("redirect_url", "")
+            })
+        
+        return {"results": jobs, "count": len(jobs)}
+        
+    except Exception as e:
+        print(f"Error fetching jobs from Adzuna: {str(e)}")
+        # Fallback to mock data on error
+        mock_jobs = [
+            {
+                "id": "fallback_job_1",
+                "title": "Software Engineering Internship",
+                "company": "TechCorp",
+                "location": "Various Locations",
+                "description": "Join our internship program and gain hands-on experience in software development.",
+                "salary": "$15-25/hour",
+                "job_type": "internship",
+                "experience_level": "entry",
+                "posted_date": "2025-01-10",
+                "apply_url": "#"
+            }
+        ]
+        return {"results": mock_jobs, "count": len(mock_jobs)}
+
+# Apply for a job
+@app.post("/api/jobs/apply")
+async def apply_for_job(application_data: dict, current_user: dict = Depends(get_current_user)):
+    try:
+        application = {
+            "id": str(uuid.uuid4()),
+            "job_id": application_data.get("job_id"),
+            "user_id": current_user["id"],
+            "applicant_name": application_data.get("applicant_name"),
+            "email": application_data.get("email"),
+            "phone": application_data.get("phone"),
+            "resume_url": application_data.get("resume_url"),
+            "cover_letter": application_data.get("cover_letter"),
+            "applied_at": datetime.utcnow(),
+            "status": "applied"
+        }
+        
+        job_applications_collection.insert_one(application)
+        
+        return {"message": "Application submitted successfully", "application_id": application["id"]}
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error submitting application: {str(e)}")
+
+# Get user's job applications
+@app.get("/api/jobs/my-applications")
+async def get_my_applications(current_user: dict = Depends(get_current_user)):
+    try:
+        applications = list(job_applications_collection.find(
+            {"user_id": current_user["id"]},
+            {"_id": 0}
+        ))
+        return applications
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching applications: {str(e)}")
+
+# Enhanced resume templates with downloadable content
+@app.get("/api/resume-templates") 
+async def get_resume_templates():
+    templates = [
+        {
+            "id": "software_engineer",
+            "name": "Software Engineer Resume",
+            "description": "Perfect template for software development roles with emphasis on technical skills and projects",
+            "preview_url": "https://images.unsplash.com/photo-1586281380349-632531db7ed4?w=400",
+            "download_url": "/api/resume-templates/software_engineer/download",
+            "category": "technical"
+        },
+        {
+            "id": "data_scientist", 
+            "name": "Data Science Resume",
+            "description": "Tailored for data science positions highlighting analytical skills and ML projects",
+            "preview_url": "https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=400",
+            "download_url": "/api/resume-templates/data_scientist/download",
+            "category": "analytical"
+        },
+        {
+            "id": "web_developer",
+            "name": "Web Developer Resume",
+            "description": "Modern template for frontend/fullstack developers showcasing web technologies",
+            "preview_url": "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400",
+            "download_url": "/api/resume-templates/web_developer/download", 
+            "category": "creative"
+        },
+        {
+            "id": "cybersecurity",
+            "name": "Cybersecurity Resume",
+            "description": "Professional template for security roles emphasizing certifications and security projects",
+            "preview_url": "https://images.unsplash.com/photo-1563013544-824ae1b704d3?w=400",
+            "download_url": "/api/resume-templates/cybersecurity/download",
+            "category": "security"
+        }
+    ]
+    return templates
+
+# Download resume template (returns template content/structure)
+@app.get("/api/resume-templates/{template_id}/download")
+async def download_resume_template(template_id: str):
+    templates_content = {
+        "software_engineer": {
+            "template_name": "Software Engineer Resume",
+            "sections": [
+                {
+                    "name": "Header",
+                    "content": "Your Name\nSoftware Engineer\nEmail: your.email@example.com | Phone: (123) 456-7890\nLinkedIn: linkedin.com/in/yourname | GitHub: github.com/yourname"
+                },
+                {
+                    "name": "Professional Summary", 
+                    "content": "Passionate software engineer with [X] years of experience in full-stack development. Proficient in [languages/technologies]. Strong problem-solving skills and collaborative team player."
+                },
+                {
+                    "name": "Technical Skills",
+                    "content": "Languages: Python, JavaScript, Java, C++\nFrameworks: React, Node.js, Django, Spring Boot\nDatabases: PostgreSQL, MongoDB, Redis\nTools: Git, Docker, Kubernetes, AWS"
+                },
+                {
+                    "name": "Experience",
+                    "content": "[Job Title] at [Company] (Month Year - Present)\n• Developed and maintained web applications using React and Node.js\n• Collaborated with cross-functional teams to deliver high-quality software\n• Implemented automated testing procedures, increasing code coverage by X%"
+                },
+                {
+                    "name": "Projects",
+                    "content": "[Project Name] - [Brief Description]\n• Built using [technologies]\n• Implemented [key features]\n• GitHub: [repository link]"
+                },
+                {
+                    "name": "Education",
+                    "content": "[Degree] in [Field]\n[University Name] - [Graduation Year]\nRelevant Coursework: Data Structures, Algorithms, Software Engineering"
+                }
+            ]
+        },
+        "data_scientist": {
+            "template_name": "Data Science Resume",
+            "sections": [
+                {
+                    "name": "Header",
+                    "content": "Your Name\nData Scientist\nEmail: your.email@example.com | Phone: (123) 456-7890\nLinkedIn: linkedin.com/in/yourname | Portfolio: yourportfolio.com"
+                },
+                {
+                    "name": "Professional Summary",
+                    "content": "Data scientist with expertise in machine learning, statistical analysis, and data visualization. Experienced in extracting insights from complex datasets to drive business decisions."
+                },
+                {
+                    "name": "Technical Skills", 
+                    "content": "Languages: Python, R, SQL\nML Libraries: scikit-learn, TensorFlow, PyTorch\nVisualization: Matplotlib, Seaborn, Tableau\nTools: Jupyter, Git, Docker, Apache Spark"
+                },
+                {
+                    "name": "Experience",
+                    "content": "[Job Title] at [Company] (Month Year - Present)\n• Developed predictive models improving [metric] by X%\n• Analyzed large datasets using Python and SQL\n• Created interactive dashboards for stakeholder reporting"
+                },
+                {
+                    "name": "Projects",
+                    "content": "[Project Name] - [Brief Description]\n• Applied [ML techniques] to solve [problem]\n• Achieved [results/metrics]\n• Technologies: [tech stack]"
+                },
+                {
+                    "name": "Education",
+                    "content": "[Degree] in [Field]\n[University Name] - [Graduation Year]\nRelevant Coursework: Statistics, Machine Learning, Data Mining"
+                }
+            ]
+        }
+        # Add more templates as needed
+    }
+    
+    if template_id not in templates_content:
+        raise HTTPException(status_code=404, detail="Template not found")
+    
+    return templates_content[template_id]
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8001)
