@@ -352,129 +352,348 @@ const CareerPathsSection = () => {
 
 // Job Guidance Section
 const JobGuidanceSection = () => {
-  const [guidance, setGuidance] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('search');
+  const [jobs, setJobs] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [location, setLocation] = useState('');
+  const [jobType, setJobType] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [templates, setTemplates] = useState([]);
+  const [showApplicationModal, setShowApplicationModal] = useState(false);
+  const [selectedJob, setSelectedJob] = useState(null);
+  const [myApplications, setMyApplications] = useState([]);
+  const { user } = useAuth();
 
   useEffect(() => {
-    fetchJobGuidance();
-  }, []);
+    fetchResumeTemplates();
+    if (user) {
+      fetchMyApplications();
+    }
+  }, [user]);
 
-  const fetchJobGuidance = async () => {
+  const fetchResumeTemplates = async () => {
     try {
-      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/job-guidance`);
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/resume-templates`);
       const data = await response.json();
-      setGuidance(data);
+      setTemplates(data);
     } catch (error) {
-      console.error('Error fetching job guidance:', error);
+      console.error('Error fetching resume templates:', error);
+    }
+  };
+
+  const fetchMyApplications = async () => {
+    if (!user) return;
+    try {
+      const token = localStorage.getItem('session_token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/jobs/my-applications`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      setMyApplications(data);
+    } catch (error) {
+      console.error('Error fetching applications:', error);
+    }
+  };
+
+  const searchJobs = async () => {
+    setLoading(true);
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/jobs/search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          query: searchQuery || 'software developer',
+          location: location,
+          job_type: jobType
+        })
+      });
+      const data = await response.json();
+      setJobs(data.results || []);
+    } catch (error) {
+      console.error('Error searching jobs:', error);
+      setJobs([]);
     } finally {
       setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <section className="py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading job guidance...</p>
-        </div>
-      </section>
-    );
-  }
+  const openApplicationModal = (job) => {
+    if (!user) {
+      alert('Please sign in to apply for jobs');
+      return;
+    }
+    setSelectedJob(job);
+    setShowApplicationModal(true);
+  };
+
+  const submitApplication = async (applicationData) => {
+    try {
+      const token = localStorage.getItem('session_token');
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/jobs/apply`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          ...applicationData,
+          job_id: selectedJob.id
+        })
+      });
+      
+      if (response.ok) {
+        alert('Application submitted successfully!');
+        setShowApplicationModal(false);
+        fetchMyApplications();
+      }
+    } catch (error) {
+      console.error('Error submitting application:', error);
+      alert('Error submitting application. Please try again.');
+    }
+  };
+
+  const downloadTemplate = async (templateId) => {
+    try {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/api/resume-templates/${templateId}/download`);
+      const data = await response.json();
+      
+      // Create a downloadable text file with the template structure
+      const content = `${data.template_name}\n\n${data.sections.map(section => 
+        `${section.name}:\n${section.content}\n\n`
+      ).join('')}`;
+      
+      const blob = new Blob([content], { type: 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${data.template_name.replace(/\s+/g, '_')}.txt`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error downloading template:', error);
+    }
+  };
 
   return (
     <section id="jobs" className="py-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold text-gray-900 mb-4">Land Your Dream Job</h2>
+          <h2 className="text-4xl font-bold text-gray-900 mb-4">Jobs & Career Resources</h2>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Get expert guidance on finding internships, applying for entry-level positions, 
-            and acing your interviews in the tech industry.
+            Find real job opportunities, apply directly, and access professional resume templates 
+            to boost your career in tech.
           </p>
         </div>
 
-        <div className="grid lg:grid-cols-2 gap-12">
-          {/* Internship Tips */}
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <span className="text-3xl mr-3">🎯</span>
-              Internship Tips
-            </h3>
-            <ul className="space-y-4">
-              {guidance?.internship_tips.map((tip, index) => (
-                <li key={index} className="flex items-start">
-                  <span className="bg-blue-500 text-white text-sm rounded-full w-6 h-6 flex items-center justify-center mr-3 mt-0.5">
-                    {index + 1}
-                  </span>
-                  <span className="text-gray-700">{tip}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Application Process */}
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <span className="text-3xl mr-3">📋</span>
-              Application Process
-            </h3>
-            <ul className="space-y-4">
-              {guidance?.application_process.map((step, index) => (
-                <li key={index} className="flex items-start">
-                  <span className="bg-green-500 text-white text-sm rounded-full w-6 h-6 flex items-center justify-center mr-3 mt-0.5">
-                    {index + 1}
-                  </span>
-                  <span className="text-gray-700">{step}</span>
-                </li>
-              ))}
-            </ul>
+        {/* Tab Navigation */}
+        <div className="flex justify-center mb-8">
+          <div className="bg-white rounded-lg p-1 shadow-md">
+            {['search', 'templates', 'applications'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab)}
+                className={`px-6 py-2 rounded-md text-sm font-medium transition-colors ${
+                  activeTab === tab
+                    ? 'bg-blue-600 text-white'
+                    : 'text-gray-600 hover:text-blue-600'
+                }`}
+              >
+                {tab === 'search' && '🔍 Job Search'}
+                {tab === 'templates' && '📄 Resume Templates'}
+                {tab === 'applications' && '📋 My Applications'}
+              </button>
+            ))}
           </div>
         </div>
 
-        {/* Resume Templates & Interview Prep */}
-        <div className="grid lg:grid-cols-2 gap-12 mt-12">
-          {/* Resume Templates */}
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <span className="text-3xl mr-3">📄</span>
-              Resume Templates
-            </h3>
-            <div className="space-y-4">
-              {guidance?.resume_templates.map((template, index) => (
-                <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
-                  <h4 className="font-semibold text-gray-900 mb-2">{template.name}</h4>
-                  <p className="text-gray-600 mb-3">{template.description}</p>
-                  <a
-                    href={template.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 transition-colors inline-block"
+        {/* Job Search Tab */}
+        {activeTab === 'search' && (
+          <div>
+            {/* Search Form */}
+            <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
+              <div className="grid md:grid-cols-4 gap-4">
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Job title or keyword"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <input
+                    type="text"
+                    placeholder="Location"
+                    value={location}
+                    onChange={(e) => setLocation(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <select
+                    value={jobType}
+                    onChange={(e) => setJobType(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
-                    Download Template
-                  </a>
+                    <option value="">All Job Types</option>
+                    <option value="full_time">Full Time</option>
+                    <option value="part_time">Part Time</option>
+                    <option value="internship">Internship</option>
+                  </select>
+                </div>
+                <div>
+                  <button
+                    onClick={searchJobs}
+                    disabled={loading}
+                    className="w-full bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                  >
+                    {loading ? 'Searching...' : 'Search Jobs'}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Job Results */}
+            <div className="space-y-6">
+              {jobs.map((job) => (
+                <div key={job.id} className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex-1">
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">{job.title}</h3>
+                      <p className="text-lg text-blue-600 font-semibold mb-1">{job.company}</p>
+                      <p className="text-gray-600 mb-2">📍 {job.location}</p>
+                      <div className="flex items-center gap-4 text-sm text-gray-500 mb-3">
+                        <span>💰 {job.salary}</span>
+                        <span>📅 {new Date(job.posted_date).toLocaleDateString()}</span>
+                        <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs">
+                          {job.job_type}
+                        </span>
+                      </div>
+                      <p className="text-gray-700 mb-4">{job.description}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => openApplicationModal(job)}
+                      className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Apply Now
+                    </button>
+                    {job.apply_url && job.apply_url !== '#' && (
+                      <a
+                        href={job.apply_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="border border-blue-600 text-blue-600 px-6 py-2 rounded-lg hover:bg-blue-50 transition-colors"
+                      >
+                        View Original
+                      </a>
+                    )}
+                  </div>
                 </div>
               ))}
+              {jobs.length === 0 && !loading && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">No jobs found. Try searching with different keywords.</p>
+                </div>
+              )}
             </div>
           </div>
+        )}
 
-          {/* Interview Preparation */}
-          <div className="bg-white rounded-xl shadow-lg p-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-6 flex items-center">
-              <span className="text-3xl mr-3">🎤</span>
-              Interview Preparation
-            </h3>
-            <ul className="space-y-4">
-              {guidance?.interview_prep.map((tip, index) => (
-                <li key={index} className="flex items-start">
-                  <span className="bg-purple-500 text-white text-sm rounded-full w-6 h-6 flex items-center justify-center mr-3 mt-0.5">
-                    ✓
+        {/* Resume Templates Tab */}
+        {activeTab === 'templates' && (
+          <div className="grid md:grid-cols-2 gap-8">
+            {templates.map((template) => (
+              <div key={template.id} className="bg-white rounded-xl shadow-lg overflow-hidden">
+                <img
+                  src={template.preview_url}
+                  alt={template.name}
+                  className="w-full h-48 object-cover"
+                />
+                <div className="p-6">
+                  <h3 className="text-xl font-bold text-gray-900 mb-2">{template.name}</h3>
+                  <p className="text-gray-600 mb-4">{template.description}</p>
+                  <span className="bg-blue-100 text-blue-800 text-sm px-2 py-1 rounded-full mb-4 inline-block">
+                    {template.category}
                   </span>
-                  <span className="text-gray-700">{tip}</span>
-                </li>
-              ))}
-            </ul>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => downloadTemplate(template.id)}
+                      className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      Download Template
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
+        )}
+
+        {/* My Applications Tab */}
+        {activeTab === 'applications' && (
+          <div>
+            {!user ? (
+              <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+                <p className="text-gray-600 mb-4">Please sign in to view your applications</p>
+                <button
+                  onClick={() => {/* This should trigger login */}}
+                  className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Sign In
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {myApplications.map((application) => (
+                  <div key={application.id} className="bg-white rounded-xl shadow-lg p-6">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          Application #{application.id.slice(0, 8)}
+                        </h3>
+                        <p className="text-gray-600">Applied: {new Date(application.applied_at).toLocaleDateString()}</p>
+                        <div className="mt-2">
+                          <span className={`px-3 py-1 rounded-full text-sm ${
+                            application.status === 'applied' ? 'bg-blue-100 text-blue-800' :
+                            application.status === 'reviewed' ? 'bg-yellow-100 text-yellow-800' :
+                            application.status === 'interviewed' ? 'bg-purple-100 text-purple-800' :
+                            application.status === 'hired' ? 'bg-green-100 text-green-800' :
+                            'bg-red-100 text-red-800'
+                          }`}>
+                            {application.status.charAt(0).toUpperCase() + application.status.slice(1)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {myApplications.length === 0 && (
+                  <div className="bg-white rounded-xl shadow-lg p-8 text-center">
+                    <p className="text-gray-600">You haven't submitted any applications yet.</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Application Modal */}
+        {showApplicationModal && selectedJob && (
+          <ApplicationModal
+            job={selectedJob}
+            onClose={() => setShowApplicationModal(false)}
+            onSubmit={submitApplication}
+          />
+        )}
       </div>
     </section>
   );
