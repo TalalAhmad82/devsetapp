@@ -498,6 +498,17 @@ class BackendTester:
         # Test 5: Blog Posts (Medium Priority)
         blog_posts_ok = self.test_blog_posts()
         
+        # Test 6: NEW JOB-RELATED APIs (High Priority)
+        print("=" * 40)
+        print("TESTING NEW JOB-RELATED APIS")
+        print("=" * 40)
+        
+        job_search_ok = self.test_job_search()
+        resume_templates_ok, templates = self.test_resume_templates()
+        resume_download_ok = self.test_resume_template_download(templates)
+        job_apply_auth_ok = self.test_job_application_auth_required()
+        my_apps_auth_ok = self.test_my_applications_auth_required()
+        
         # Summary
         print("=" * 60)
         print("TEST SUMMARY")
@@ -515,16 +526,21 @@ class BackendTester:
         core_apis_working = health_ok and career_paths_ok and career_detail_ok
         auth_working = auth_login_ok and auth_profile_ok
         content_working = job_guidance_ok and blog_posts_ok
+        job_apis_working = job_search_ok and resume_templates_ok and resume_download_ok and job_apply_auth_ok and my_apps_auth_ok
         
         print("CORE FUNCTIONALITY STATUS:")
         print(f"✅ Health & Career Paths (Core Value): {'WORKING' if core_apis_working else 'FAILED'}")
         print(f"✅ Authentication System: {'WORKING' if auth_working else 'FAILED'}")
         print(f"✅ Content APIs (Job/Blog): {'WORKING' if content_working else 'FAILED'}")
+        print(f"✅ NEW Job-Related APIs: {'WORKING' if job_apis_working else 'FAILED'}")
         print()
         
-        if core_apis_working:
-            print("🎉 CORE BACKEND FUNCTIONALITY IS WORKING!")
-            print("The main value proposition (career exploration) is functional.")
+        if core_apis_working and job_apis_working:
+            print("🎉 ALL BACKEND FUNCTIONALITY IS WORKING!")
+            print("Both core features and new job-related APIs are functional.")
+        elif core_apis_working:
+            print("✅ CORE BACKEND FUNCTIONALITY IS WORKING!")
+            print("⚠️  Some issues found in new job-related APIs.")
         else:
             print("⚠️  CRITICAL ISSUES FOUND IN CORE FUNCTIONALITY")
             print("Career exploration features need attention.")
@@ -535,6 +551,7 @@ class BackendTester:
             "core_working": core_apis_working,
             "auth_working": auth_working,
             "content_working": content_working,
+            "job_apis_working": job_apis_working,
             "detailed_results": self.test_results
         }
 
