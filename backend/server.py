@@ -84,6 +84,24 @@ class BlogPost(BaseModel):
     created_at: datetime
     tags: List[str]
 
+class JobApplication(BaseModel):
+    id: str
+    job_id: str
+    user_id: str
+    applicant_name: str
+    email: str
+    phone: str
+    resume_url: Optional[str] = None
+    cover_letter: str
+    applied_at: datetime
+    status: str  # applied, reviewed, interviewed, rejected, hired
+
+class JobSearchQuery(BaseModel):
+    query: str
+    location: Optional[str] = None
+    job_type: Optional[str] = None  # full_time, part_time, internship
+    experience_level: Optional[str] = None  # entry, mid, senior
+
 # Authentication helpers
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
     token = credentials.credentials
